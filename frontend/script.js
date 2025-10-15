@@ -5,7 +5,7 @@ const API_URL = '/api';
 let currentSessionId = null;
 
 // DOM elements
-let chatMessages, chatInput, sendButton, totalCourses, courseTitles, newChatButton;
+let chatMessages, chatInput, sendButton, totalCourses, courseTitles, newChatButton, themeToggle;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -16,8 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
     totalCourses = document.getElementById('totalCourses');
     courseTitles = document.getElementById('courseTitles');
     newChatButton = document.getElementById('newChatButton');
+    themeToggle = document.getElementById('themeToggle');
 
     setupEventListeners();
+    initializeTheme();
     createNewSession();
     loadCourseStats();
 });
@@ -35,6 +37,19 @@ function setupEventListeners() {
         newChatButton.addEventListener('click', clearChat);
     }
 
+    // Theme toggle button
+    if (themeToggle) {
+        themeToggle.addEventListener('click', toggleTheme);
+
+        // Keyboard accessibility - toggle on Enter or Space
+        themeToggle.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleTheme();
+            }
+        });
+    }
+
     // Suggested questions
     document.querySelectorAll('.suggested-item').forEach(button => {
         button.addEventListener('click', (e) => {
@@ -43,6 +58,69 @@ function setupEventListeners() {
             sendMessage();
         });
     });
+}
+
+// Theme Functions
+function initializeTheme() {
+    // Check if user has a saved preference
+    const savedTheme = localStorage.getItem('theme');
+
+    if (savedTheme) {
+        // Use saved preference
+        applyTheme(savedTheme);
+    } else {
+        // Detect system preference if no saved theme
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        applyTheme(prefersDark ? 'dark' : 'light');
+    }
+
+    // Listen for system theme changes (optional enhancement)
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        // Only auto-switch if user hasn't set a preference
+        if (!localStorage.getItem('theme')) {
+            applyTheme(e.matches ? 'dark' : 'light');
+        }
+    });
+}
+
+function applyTheme(theme) {
+    const root = document.documentElement;
+
+    if (theme === 'light') {
+        root.classList.add('light-theme');
+        root.setAttribute('data-theme', 'light');
+    } else {
+        root.classList.remove('light-theme');
+        root.setAttribute('data-theme', 'dark');
+    }
+
+    // Update button aria-label for accessibility
+    if (themeToggle) {
+        const currentTheme = theme === 'light' ? 'light' : 'dark';
+        const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
+        themeToggle.setAttribute('aria-label', `Switch to ${nextTheme} theme (currently ${currentTheme})`);
+    }
+
+    // Dispatch custom event for extensibility
+    window.dispatchEvent(new CustomEvent('themechange', {
+        detail: { theme }
+    }));
+}
+
+function toggleTheme() {
+    const root = document.documentElement;
+    const isLight = root.classList.contains('light-theme');
+    const newTheme = isLight ? 'dark' : 'light';
+
+    // Save preference
+    localStorage.setItem('theme', newTheme);
+
+    // Apply theme
+    applyTheme(newTheme);
+}
+
+function getCurrentTheme() {
+    return document.documentElement.classList.contains('light-theme') ? 'light' : 'dark';
 }
 
 
