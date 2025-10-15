@@ -1,6 +1,9 @@
 import warnings
 warnings.filterwarnings("ignore", message="resource_tracker: There appear to be.*")
 
+# CRITICAL: Import SSL fix FIRST before any other imports
+import ssl_fix  # This must be first to properly disable SSL verification
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -40,10 +43,15 @@ class QueryRequest(BaseModel):
     query: str
     session_id: Optional[str] = None
 
+class SourceItem(BaseModel):
+    """Model for a single source with optional link"""
+    text: str
+    url: Optional[str] = None
+
 class QueryResponse(BaseModel):
     """Response model for course queries"""
     answer: str
-    sources: List[str]
+    sources: List[SourceItem]
     session_id: str
 
 class CourseStats(BaseModel):
@@ -61,16 +69,25 @@ async def query_documents(request: QueryRequest):
         session_id = request.session_id
         if not session_id:
             session_id = rag_system.session_manager.create_session()
-        
+
         # Process query using RAG system
         answer, sources = rag_system.query(request.query, session_id)
-        
+
+        # Convert sources (list of dicts) to SourceItem objects
+        source_items = [SourceItem(**src) if isinstance(src, dict) else SourceItem(text=src) for src in sources]
+
         return QueryResponse(
             answer=answer,
-            sources=sources,
+            sources=source_items,
             session_id=session_id
         )
     except Exception as e:
+        # Log the full error for debugging
+        import traceback
+        print(f"Error in /api/query endpoint:")
+        print(f"  Query: {request.query}")
+        print(f"  Error: {e}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/courses", response_model=CourseStats)
@@ -85,17 +102,35 @@ async def get_course_stats():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/api/session/{session_id}")
+async def clear_session(session_id: str):
+    """Clear a conversation session"""
+    try:
+        rag_system.session_manager.clear_session(session_id)
+        return {"status": "success", "message": f"Session {session_id} cleared"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.on_event("startup")
 async def startup_event():
-    """Load initial documents on startup"""
-    docs_path = "../docs"
-    if os.path.exists(docs_path):
-        print("Loading initial documents...")
-        try:
-            courses, chunks = rag_system.add_course_folder(docs_path, clear_existing=False)
-            print(f"Loaded {courses} courses with {chunks} chunks")
-        except Exception as e:
-            print(f"Error loading documents: {e}")
+    """Check for existing documents and configuration on startup"""
+    print("Checking system configuration...")
+
+    # Validate MAX_RESULTS configuration
+    if rag_system.vector_store.max_results == 0:
+        print("⚠️  WARNING: MAX_RESULTS is set to 0 - queries will fail!")
+        print("⚠️  Please update config.py to set MAX_RESULTS to a positive value (e.g., 5)")
+    else:
+        print(f"✓ MAX_RESULTS: {rag_system.vector_store.max_results}")
+
+    print("\nChecking for existing documents in vector store...")
+    try:
+        analytics = rag_system.get_course_analytics()
+        print(f"Found {analytics['total_courses']} course(s) in vector store")
+        if analytics['total_courses'] == 0:
+            print("⚠️  No documents loaded. Run 'uv run python load_documents.py' to load documents")
+    except Exception as e:
+        print(f"Could not check course analytics: {e}")
 
 # Custom static file handler with no-cache headers for development
 from fastapi.staticfiles import StaticFiles

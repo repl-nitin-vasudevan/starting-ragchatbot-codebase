@@ -241,8 +241,61 @@ header h1 {
 }
 
 .sources-content {
-    padding: 0 0.5rem 0.25rem 1.5rem;
+    padding: 0.5rem 0.5rem 0.5rem 1.5rem;
     color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    line-height: 1.6;
+}
+
+/* Source link styling */
+.source-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    padding: 0.4rem 0.75rem;
+    background: rgba(37, 99, 235, 0.1);
+    border-left: 3px solid var(--primary-color);
+    border-radius: 4px;
+    display: inline-block;
+    margin: 0.15rem 0;
+    font-size: 0.9rem;
+    max-width: 100%;
+    word-wrap: break-word;
+}
+
+.source-link:hover {
+    background: rgba(37, 99, 235, 0.2);
+    border-left-color: var(--primary-hover);
+    color: var(--primary-hover);
+    transform: translateX(2px);
+}
+
+.source-link:visited {
+    color: #8b5cf6;
+    border-left-color: #8b5cf6;
+    background: rgba(139, 92, 246, 0.1);
+}
+
+.source-link:visited:hover {
+    color: #7c3aed;
+    border-left-color: #7c3aed;
+    background: rgba(124, 58, 237, 0.2);
+}
+
+/* Non-link source text styling */
+.source-text {
+    color: var(--text-secondary);
+    padding: 0.4rem 0.75rem;
+    background: rgba(148, 163, 184, 0.1);
+    border-left: 3px solid var(--text-secondary);
+    border-radius: 4px;
+    display: inline-block;
+    margin: 0.15rem 0;
+    font-size: 0.9rem;
+    max-width: 100%;
+    word-wrap: break-word;
 }
 
 /* Markdown formatting styles */
@@ -443,6 +496,35 @@ header h1 {
     border-radius: 8px;
     border: 1px solid rgba(34, 197, 94, 0.2);
     margin: 0.5rem 0;
+}
+
+/* New Chat Button */
+.new-chat-button {
+    width: 100%;
+    padding: 0.5rem 0;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: color 0.2s ease;
+    text-align: left;
+}
+
+.new-chat-button:hover {
+    color: var(--primary-color);
+}
+
+.new-chat-button:focus {
+    outline: none;
+    color: var(--primary-color);
+}
+
+.new-chat-button:active {
+    color: var(--primary-color);
 }
 
 /* Sidebar Headers */

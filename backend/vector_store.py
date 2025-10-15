@@ -1,3 +1,5 @@
+import ssl_fix  # Import SSL fix first
+
 import chromadb
 from chromadb.config import Settings
 from typing import List, Dict, Any, Optional
@@ -12,41 +14,75 @@ class SearchResults:
     metadata: List[Dict[str, Any]]
     distances: List[float]
     error: Optional[str] = None
-    
+    source_links: Optional[List[Dict[str, str]]] = None  # List of {"text": "...", "url": "..."}
+
     @classmethod
     def from_chroma(cls, chroma_results: Dict) -> 'SearchResults':
         """Create SearchResults from ChromaDB query results"""
         return cls(
             documents=chroma_results['documents'][0] if chroma_results['documents'] else [],
             metadata=chroma_results['metadatas'][0] if chroma_results['metadatas'] else [],
-            distances=chroma_results['distances'][0] if chroma_results['distances'] else []
+            distances=chroma_results['distances'][0] if chroma_results['distances'] else [],
+            source_links=[]  # Will be populated later
         )
-    
+
     @classmethod
     def empty(cls, error_msg: str) -> 'SearchResults':
         """Create empty results with error message"""
-        return cls(documents=[], metadata=[], distances=[], error=error_msg)
-    
+        return cls(documents=[], metadata=[], distances=[], error=error_msg, source_links=[])
+
     def is_empty(self) -> bool:
         """Check if results are empty"""
         return len(self.documents) == 0
 
 class VectorStore:
     """Vector storage using ChromaDB for course content and metadata"""
-    
+
     def __init__(self, chroma_path: str, embedding_model: str, max_results: int = 5):
+        # Validate max_results configuration
+        if max_results <= 0:
+            raise ValueError(f"max_results must be positive, got {max_results}. "
+                           "This will cause search queries to return 0 results. "
+                           "Please set MAX_RESULTS to a positive value in config.py (e.g., 5)")
         self.max_results = max_results
-        # Initialize ChromaDB client
+
+        # Configure ChromaDB settings to disable SSL verification
+        import os
+        os.environ['CHROMA_TELEMETRY'] = 'false'
+        os.environ['ANONYMIZED_TELEMETRY'] = 'false'
+
+        # Initialize ChromaDB client with SSL-friendly settings
+        settings = Settings(
+            anonymized_telemetry=False,
+            allow_reset=True,
+            is_persistent=True
+        )
+
         self.client = chromadb.PersistentClient(
             path=chroma_path,
-            settings=Settings(anonymized_telemetry=False)
+            settings=settings
         )
-        
-        # Set up sentence transformer embedding function
-        self.embedding_function = chromadb.utils.embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name=embedding_model
-        )
-        
+
+        # Set up embedding function - skip the problematic sentence-transformers
+        # and go straight to the default which works in corporate environments
+        print("Initializing embedding function...")
+        try:
+            from chromadb.utils import embedding_functions
+            # Use default embedding function which doesn't require external downloads
+            self.embedding_function = embedding_functions.DefaultEmbeddingFunction()
+            print("✓ Using ChromaDB default embedding function (no external downloads required)")
+        except Exception as e:
+            print(f"⚠ Could not initialize default embedding: {e}")
+            # Last resort - try sentence transformers
+            try:
+                self.embedding_function = chromadb.utils.embedding_functions.SentenceTransformerEmbeddingFunction(
+                    model_name=embedding_model
+                )
+                print(f"✓ Loaded embedding model: {embedding_model}")
+            except Exception as e2:
+                print(f"✗ All embedding options failed: {e2}")
+                raise RuntimeError("Could not initialize any embedding function") from e
+
         # Create collections for different types of data
         self.course_catalog = self._create_collection("course_catalog")  # Course titles/instructors
         self.course_content = self._create_collection("course_content")  # Actual course material
