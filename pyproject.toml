@@ -16,5 +16,23 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "black>=25.9.0",
+    "mypy>=1.18.2",
     "pytest>=8.4.2",
+    "ruff>=0.14.0",
 ]
+
+[tool.black]
+line-length = 88
+target-version = ['py313']
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.13"
+check_untyped_defs = true

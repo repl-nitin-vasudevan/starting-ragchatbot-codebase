@@ -1,8 +1,8 @@
-import ssl_fix  # Import SSL fix first
+
 
 import anthropic
-from typing import List, Optional, Dict, Any
 import httpx
+
 
 class AIGenerator:
     """Handles interactions with Anthropic's Claude API for generating responses"""
@@ -47,7 +47,7 @@ All responses must be:
 4. **Example-supported** - Include relevant examples when they aid understanding
 Provide only the direct answer to what was asked.
 """
-    
+
     def __init__(self, api_key: str, model: str):
         # Create httpx client with SSL verification disabled
         http_client = httpx.Client(verify=False, timeout=60.0)
@@ -55,16 +55,15 @@ Provide only the direct answer to what was asked.
         self.model = model
 
         # Pre-build base API parameters
-        self.base_params = {
-            "model": self.model,
-            "temperature": 0,
-            "max_tokens": 800
-        }
-    
-    def generate_response(self, query: str,
-                         conversation_history: Optional[str] = None,
-                         tools: Optional[List] = None,
-                         tool_manager=None) -> str:
+        self.base_params = {"model": self.model, "temperature": 0, "max_tokens": 800}
+
+    def generate_response(
+        self,
+        query: str,
+        conversation_history: str | None = None,
+        tools: list | None = None,
+        tool_manager=None,
+    ) -> str:
         """
         Generate AI response with optional tool usage and conversation context.
         Supports up to 2 sequential rounds of tool calling.
@@ -99,7 +98,7 @@ Provide only the direct answer to what was asked.
             api_params = {
                 **self.base_params,
                 "messages": messages,
-                "system": system_content
+                "system": system_content,
             }
 
             # Add tools if available
@@ -122,7 +121,9 @@ Provide only the direct answer to what was asked.
                 return self._extract_text(current_response)
 
             # Execute tools and get results
-            tool_results, execution_error = self._execute_all_tools(current_response, tool_manager)
+            tool_results, execution_error = self._execute_all_tools(
+                current_response, tool_manager
+            )
 
             # TERMINATION CONDITION 3: Tool execution failure
             if execution_error:
@@ -137,12 +138,16 @@ Provide only the direct answer to what was asked.
 
         # If we exited loop due to max rounds and last response was tool_use,
         # make one more API call to get final answer
-        if current_response and current_response.stop_reason == "tool_use" and round_count >= self.MAX_TOOL_ROUNDS:
+        if (
+            current_response
+            and current_response.stop_reason == "tool_use"
+            and round_count >= self.MAX_TOOL_ROUNDS
+        ):
             # Make final API call for Claude's answer (with tools still available)
             final_api_params = {
                 **self.base_params,
                 "messages": messages,
-                "system": system_content
+                "system": system_content,
             }
             if tools:
                 final_api_params["tools"] = tools
@@ -151,11 +156,13 @@ Provide only the direct answer to what was asked.
             try:
                 current_response = self.client.messages.create(**final_api_params)
             except Exception as e:
-                return f"I encountered an error while generating final response: {str(e)}"
+                return (
+                    f"I encountered an error while generating final response: {str(e)}"
+                )
 
         # Extract and return final text response
         return self._extract_text(current_response)
-    
+
     def _execute_all_tools(self, response, tool_manager):
         """
         Execute all tool calls from a response and collect results.
@@ -176,22 +183,24 @@ Provide only the direct answer to what was asked.
                 try:
                     # Execute the tool
                     tool_result = tool_manager.execute_tool(
-                        content_block.name,
-                        **content_block.input
+                        content_block.name, **content_block.input
                     )
 
                     # Check if result indicates an error
                     if isinstance(tool_result, str) and (
-                        tool_result.startswith("Error:") or tool_result.startswith("Tool")
+                        tool_result.startswith("Error:")
+                        or tool_result.startswith("Tool")
                     ):
                         return None, f"Tool execution failed: {tool_result}"
 
                     # Add successful result
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": content_block.id,
-                        "content": tool_result
-                    })
+                    tool_results.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": content_block.id,
+                            "content": tool_result,
+                        }
+                    )
 
                 except Exception as e:
                     return None, f"Tool execution exception: {str(e)}"
@@ -210,7 +219,7 @@ Provide only the direct answer to what was asked.
             User-friendly error message
         """
         # Try to extract any text content Claude provided before requesting tools
-        text_blocks = [block for block in response.content if hasattr(block, 'text')]
+        text_blocks = [block for block in response.content if hasattr(block, "text")]
 
         if text_blocks:
             return f"{text_blocks[0].text}\n\n[Note: Unable to complete search due to error: {error_message}]"
@@ -233,7 +242,7 @@ Provide only the direct answer to what was asked.
 
         # Find first text block in response content
         for content_block in response.content:
-            if hasattr(content_block, 'text'):
+            if hasattr(content_block, "text"):
                 return content_block.text
 
         # Fallback if no text found

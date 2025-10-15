@@ -1,28 +1,23 @@
 import warnings
+
 warnings.filterwarnings("ignore", message="resource_tracker: There appear to be.*")
 
 # CRITICAL: Import SSL fix FIRST before any other imports
-import ssl_fix  # This must be first to properly disable SSL verification
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from pydantic import BaseModel
-from typing import List, Optional
-import os
 
 from config import config
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from rag_system import RAGSystem
 
 # Initialize FastAPI app
 app = FastAPI(title="Course Materials RAG System", root_path="")
 
 # Add trusted host middleware for proxy
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=["*"]
-)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 
 # Enable CORS with proper settings for proxy
 app.add_middleware(
@@ -37,29 +32,39 @@ app.add_middleware(
 # Initialize RAG system
 rag_system = RAGSystem(config)
 
+
 # Pydantic models for request/response
 class QueryRequest(BaseModel):
     """Request model for course queries"""
+
     query: str
-    session_id: Optional[str] = None
+    session_id: str | None = None
+
 
 class SourceItem(BaseModel):
     """Model for a single source with optional link"""
+
     text: str
-    url: Optional[str] = None
+    url: str | None = None
+
 
 class QueryResponse(BaseModel):
     """Response model for course queries"""
+
     answer: str
-    sources: List[SourceItem]
+    sources: list[SourceItem]
     session_id: str
+
 
 class CourseStats(BaseModel):
     """Response model for course statistics"""
+
     total_courses: int
-    course_titles: List[str]
+    course_titles: list[str]
+
 
 # API Endpoints
+
 
 @app.post("/api/query", response_model=QueryResponse)
 async def query_documents(request: QueryRequest):
@@ -74,21 +79,22 @@ async def query_documents(request: QueryRequest):
         answer, sources = rag_system.query(request.query, session_id)
 
         # Convert sources (list of dicts) to SourceItem objects
-        source_items = [SourceItem(**src) if isinstance(src, dict) else SourceItem(text=src) for src in sources]
+        source_items = [
+            SourceItem(**src) if isinstance(src, dict) else SourceItem(text=src)
+            for src in sources
+        ]
 
-        return QueryResponse(
-            answer=answer,
-            sources=source_items,
-            session_id=session_id
-        )
+        return QueryResponse(answer=answer, sources=source_items, session_id=session_id)
     except Exception as e:
         # Log the full error for debugging
         import traceback
-        print(f"Error in /api/query endpoint:")
+
+        print("Error in /api/query endpoint:")
         print(f"  Query: {request.query}")
         print(f"  Error: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/courses", response_model=CourseStats)
 async def get_course_stats():
@@ -97,10 +103,11 @@ async def get_course_stats():
         analytics = rag_system.get_course_analytics()
         return CourseStats(
             total_courses=analytics["total_courses"],
-            course_titles=analytics["course_titles"]
+            course_titles=analytics["course_titles"],
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.delete("/api/session/{session_id}")
 async def clear_session(session_id: str):
@@ -111,6 +118,7 @@ async def clear_session(session_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.on_event("startup")
 async def startup_event():
     """Check for existing documents and configuration on startup"""
@@ -119,7 +127,9 @@ async def startup_event():
     # Validate MAX_RESULTS configuration
     if rag_system.vector_store.max_results == 0:
         print("⚠️  WARNING: MAX_RESULTS is set to 0 - queries will fail!")
-        print("⚠️  Please update config.py to set MAX_RESULTS to a positive value (e.g., 5)")
+        print(
+            "⚠️  Please update config.py to set MAX_RESULTS to a positive value (e.g., 5)"
+        )
     else:
         print(f"✓ MAX_RESULTS: {rag_system.vector_store.max_results}")
 
@@ -127,16 +137,17 @@ async def startup_event():
     try:
         analytics = rag_system.get_course_analytics()
         print(f"Found {analytics['total_courses']} course(s) in vector store")
-        if analytics['total_courses'] == 0:
-            print("⚠️  No documents loaded. Run 'uv run python load_documents.py' to load documents")
+        if analytics["total_courses"] == 0:
+            print(
+                "⚠️  No documents loaded. Run 'uv run python load_documents.py' to load documents"
+            )
     except Exception as e:
         print(f"Could not check course analytics: {e}")
 
+
 # Custom static file handler with no-cache headers for development
-from fastapi.staticfiles import StaticFiles
+
 from fastapi.responses import FileResponse
-import os
-from pathlib import Path
 
 
 class DevStaticFiles(StaticFiles):
@@ -148,7 +159,7 @@ class DevStaticFiles(StaticFiles):
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
         return response
-    
-    
+
+
 # Serve static files for the frontend
 app.mount("/", StaticFiles(directory="../frontend", html=True), name="static")
