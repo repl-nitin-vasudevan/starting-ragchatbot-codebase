@@ -249,7 +249,7 @@ function escapeHtml(text) {
 async function createNewSession() {
     currentSessionId = null;
     chatMessages.innerHTML = '';
-    addMessage('Welcome to the Course Materials Assistant! I can help you with questions about courses, lessons and specific content. What would you like to know?', 'assistant', null, true);
+    addMessage('WELCOME TO THE COURSE MATERIALS! Got any questions?', 'assistant', null, true);
 }
 
 async function clearChat() {
@@ -271,7 +271,7 @@ async function clearChat() {
     chatInput.value = '';
 
     // Show welcome message
-    addMessage('Welcome to the Course Materials Assistant! I can help you with questions about courses, lessons and specific content. What would you like to know?', 'assistant', null, true);
+    addMessage('WELCOME TO THE COURSE MATERIALS! Got any questions?', 'assistant', null, true);
 
     // Focus input
     chatInput.focus();
